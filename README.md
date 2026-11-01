@@ -8,6 +8,7 @@ Android inventory app built with Kotlin. It works offline first: every change is
 - Offline support: data is stored locally in Room and synced with Firestore
 - Real-time sync between devices using Firestore snapshot listeners
 - Import a product catalog from a REST API (DummyJSON) with Retrofit
+- Email and password login with Firebase Authentication
 
 ## Tech stack
 
@@ -24,8 +25,13 @@ Android inventory app built with Kotlin. It works offline first: every change is
 
 ## Setup
 
-This repository does not include `google-services.json`. To run the app, create your own Firebase project, add an Android app with the package name `com.datacore.inventarioapp` and place the downloaded `google-services.json` inside the `app/` folder.
+This repository does not include `google-services.json`. To run the app:
+
+1. Create your own Firebase project and add an Android app with the package name `com.datacore.inventarioapp`.
+2. Download `google-services.json` and place it inside the `app/` folder.
+3. In the Firebase console, enable **Authentication** with the Email/Password provider.
+4. Create a Cloud Firestore database and publish rules that allow access only to authenticated users.
 
 ## Status
 
-Work in progress. Planned next: Firebase Authentication, secure Firestore rules and screenshots.
+Work in progress. Planned next: screenshots and unit tests for the ViewModel.
