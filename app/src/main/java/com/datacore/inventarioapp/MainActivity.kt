@@ -19,18 +19,14 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.floatingactionbutton.FloatingActionButton
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.flatMapLatest
+import androidx.activity.viewModels
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var repositorio: ProductoRepository
+    private val viewModel: ProductoViewModel by viewModels()
     private lateinit var adapter: ProductoAdapter
-    private val consulta = MutableStateFlow("")
 
-    @OptIn(ExperimentalCoroutinesApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -41,17 +37,12 @@ class MainActivity : AppCompatActivity() {
             insets
         }
 
-        val dao = AppDatabase.getDatabase(this).productoDao()
-        repositorio = ProductoRepository(dao) { mensaje ->
-            runOnUiThread { Toast.makeText(this, mensaje, Toast.LENGTH_LONG).show() }
-        }
-
         val rv = findViewById<RecyclerView>(R.id.rvProductos)
         val tvVacio = findViewById<TextView>(R.id.tvVacio)
         val etBuscar = findViewById<EditText>(R.id.etBuscar)
         val fab = findViewById<FloatingActionButton>(R.id.fabAgregar)
         val btnImportar = findViewById<Button>(R.id.btnImportar)
-        btnImportar.setOnClickListener { importarCatalogo(btnImportar) }
+        btnImportar.setOnClickListener { viewModel.importarCatalogo() }
 
         adapter = ProductoAdapter(
             alEditar = { mostrarDialogo(it) },
@@ -61,34 +52,40 @@ class MainActivity : AppCompatActivity() {
         rv.adapter = adapter
 
         etBuscar.doOnTextChanged { texto, _, _, _ ->
-            consulta.value = texto?.toString() ?: ""
+            viewModel.buscar(texto?.toString() ?: "")
         }
         fab.setOnClickListener { mostrarDialogo(null) }
 
-        // LEER: la lista se alimenta de Room (Flow) y se actualiza sola
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                consulta
-                    .flatMapLatest { texto ->
-                        if (texto.isBlank()) repositorio.productos
-                        else repositorio.buscar(texto.trim())
-                    }
-                    .collect { lista ->
+                launch {
+                    viewModel.productos.collect { lista ->
                         adapter.submitList(lista)
                         tvVacio.visibility = if (lista.isEmpty()) View.VISIBLE else View.GONE
                     }
+                }
+                launch {
+                    viewModel.mensajes.collect { mensaje ->
+                        Toast.makeText(this@MainActivity, mensaje, Toast.LENGTH_LONG).show()
+                    }
+                }
+                launch {
+                    viewModel.importando.collect { enCurso ->
+                        btnImportar.isEnabled = !enCurso
+                    }
+                }
             }
         }
     }
 
     override fun onStart() {
         super.onStart()
-        repositorio.iniciarSincronizacion()
+        viewModel.iniciarSincronizacion()
     }
 
     override fun onStop() {
         super.onStop()
-        repositorio.detenerSincronizacion()
+        viewModel.detenerSincronizacion()
     }
 
     // CREAR y ACTUALIZAR (mismo formulario)
@@ -142,18 +139,8 @@ class MainActivity : AppCompatActivity() {
                     proveedor = etProveedor.text.toString().trim()
                 )
 
-                lifecycleScope.launch {
-                    try {
-                        if (producto == null) repositorio.crear(guardado)
-                        else repositorio.actualizar(guardado)
-                    } catch (e: Exception) {
-                        Toast.makeText(
-                            this@MainActivity,
-                            "Error al guardar en la base local: ${e.message}",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
-                }
+                if (producto == null) viewModel.crear(guardado)
+                else viewModel.actualizar(guardado)
                 dialogo.dismiss()
             }
         }
@@ -166,44 +153,7 @@ class MainActivity : AppCompatActivity() {
             .setTitle("Eliminar producto")
             .setMessage("¿Eliminar \"${producto.nombre}\" del inventario?")
             .setNegativeButton("Cancelar", null)
-            .setPositiveButton("Eliminar") { _, _ ->
-                lifecycleScope.launch {
-                    try {
-                        repositorio.eliminar(producto)
-                    } catch (e: Exception) {
-                        Toast.makeText(
-                            this@MainActivity,
-                            "Error al eliminar: ${e.message}",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
-                }
-            }
+            .setPositiveButton("Eliminar") { _, _ -> viewModel.eliminar(producto) }
             .show()
-    }
-
-
-    private fun importarCatalogo(boton: Button) {
-        boton.isEnabled = false
-        Toast.makeText(this, "Importando catálogo…", Toast.LENGTH_SHORT).show()
-        lifecycleScope.launch {
-            val resultado = repositorio.importarCatalogo("phone")
-            boton.isEnabled = true
-            resultado
-                .onSuccess { cantidad ->
-                    Toast.makeText(
-                        this@MainActivity,
-                        "Se importaron $cantidad productos",
-                        Toast.LENGTH_LONG
-                    ).show()
-                }
-                .onFailure { error ->
-                    Toast.makeText(
-                        this@MainActivity,
-                        "No se pudo importar: ${error.message}",
-                        Toast.LENGTH_LONG
-                    ).show()
-                }
-        }
     }
 }
