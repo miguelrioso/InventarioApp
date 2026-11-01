@@ -10,6 +10,14 @@ Android inventory app built with Kotlin. It works offline first: every change is
 - Import a product catalog from a REST API (DummyJSON) with Retrofit
 - Email and password login with Firebase Authentication
 
+## Screenshots
+
+<p align="center">
+  <img src="screenshots/login.jpg" width="250" alt="Login screen" />
+  <img src="screenshots/inventory.jpg" width="250" alt="Inventory list" />
+  <img src="screenshots/new-product.jpg" width="250" alt="New product dialog" />
+</p>
+
 ## Tech stack
 
 - Kotlin, XML views with Material Components
